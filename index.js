@@ -5,7 +5,10 @@ const path = require('path');
 const FormData = require('form-data');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
+const { default: OpenAI } = require('openai');
 require('dotenv').config();
+
+const openai = new OpenAI();
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
@@ -62,7 +65,11 @@ const formatTimestamp = (seconds) => {
  * @param {string} outputSrtPath - Caminho do arquivo SRT de saída.
  * @param {number} segmentDuration - Duração de cada segmento em segundos (padrão é 60).
  */
-const createSrtFile = (transcriptions, outputSrtPath, segmentDuration = 60) => {
+const createSrtFile = async (
+  transcriptions,
+  outputSrtPath,
+  segmentDuration = 60
+) => {
   const srtLines = transcriptions.map((text, index) => {
     const startTime = formatTimestamp(index * segmentDuration);
     const endTime = formatTimestamp((index + 1) * segmentDuration);
@@ -71,6 +78,7 @@ const createSrtFile = (transcriptions, outputSrtPath, segmentDuration = 60) => {
 
   fs.writeFileSync(outputSrtPath, srtLines.join('\n'), 'utf-8');
   console.log(`Arquivo de legenda SRT criado: ${outputSrtPath}`);
+  await translateToPortugueseSRT(outputSrtPath);
 };
 
 /**
@@ -179,11 +187,23 @@ const extractAudio = (inputVideoPath) => {
   });
 };
 
+const checkFoldersExists = async () => {
+  if (!fs.existsSync(path.join(__dirname, 'temp'))) {
+    fs.mkdirSync(path.join(__dirname, 'temp'));
+  }
+
+  if (!fs.existsSync(path.join(__dirname, 'videos'))) {
+    fs.mkdirSync(path.join(__dirname, 'videos'));
+  }
+};
+
 /**
  * Escaneia uma pasta e extrai o áudio de todos os arquivos de vídeo.
  * @param {string} folderPath - Caminho da pasta contendo os vídeos.
  */
 const processVideosInFolder = async (folderPath) => {
+  await checkFoldersExists;
+
   fs.readdir(folderPath, async (err, files) => {
     if (err) {
       console.error('Erro ao ler a pasta:', err);
@@ -214,6 +234,38 @@ const processVideosInFolder = async (folderPath) => {
       }
     }
   });
+};
+
+const translateToPortugueseSRT = async (srtPath) => {
+  const srtContent = fs.readFileSync(srtPath, 'utf-8');
+  const lines = srtContent.split('\n');
+  const translatedLines = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].includes('-->')) {
+      translatedLines.push(lines[i]);
+    } else {
+      const text = lines[i];
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'Translate the following text to Portuguese: ' + text,
+          },
+        ],
+      });
+
+      const translation = completion.data.choices[0].message.content;
+
+      translatedLines.push(translation);
+    }
+  }
+
+  fs.writeFileSync(`output.pt-br.srt`, translatedLines.join('\n'), 'utf-8');
+
+  console.log(`Arquivo de legenda SRT traduzido para português: ${srtPath}`);
 };
 
 const folderPath = path.join(__dirname, 'videos');
