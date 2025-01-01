@@ -24,9 +24,10 @@ The `index.js` file is the main entry point of the project. It contains the code
 To run the project, follow the steps below:
 
 1. Make sure all dependencies are installed.
-2. Run the command `node index.js` in the terminal.
-3. Provide the path to the audio file you want to transcribe.
-4. The transcription will be saved to a text file in the same folder.
+2. Create a `.env` file in the root directory with your OpenAI TOKEN. You can use the `.env.example` file as a template.
+3. Run the command `node index.js` in the terminal.
+4. Provide the path to the audio file you want to transcribe.
+5. The transcription will be saved to a text file in the same folder.
 
 ### Dependencies
 
